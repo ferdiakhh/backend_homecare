@@ -6,7 +6,7 @@ services:
     container_name: homecare-backend
     build: .
     ports:
-      - "8085:8080" # Port VPS : Port Container
+      - "127.0.0.1:8085:8080" # Port VPS : Port Container
     depends_on:
       - db
     restart: always
