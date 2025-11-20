@@ -1,0 +1,15 @@
+# Environment variables - SANGAT PENTING!
+.env
+
+
+# User uploaded files
+/uploads/
+
+# Compiled binary files from Go
+*.exe
+*.out
+aspirasi-backend
+
+# IDE/Editor specific files
+.vscode/
+.idea/
