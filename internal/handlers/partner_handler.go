@@ -66,3 +66,63 @@ func GetServices(c *gin.Context) {
 
 	utils.APIResponse(c, http.StatusOK, true, "Daftar Layanan", services)
 }
+
+// GetAvailableOrders menampilkan job yang sudah dibayar tapi belum ada perawatnya
+func GetAvailableOrders(c *gin.Context) {
+	var orders []models.Order
+
+	// Logic: Status PAID + PartnerID masih Kosong (NULL)
+	// Preload Service & Patient biar perawat tau ini sakit apa & bayarannya berapa
+	config.DB.Preload("Service").Preload("Patient").Where("status = ? AND partner_id IS NULL", "PAID").Find(&orders)
+	utils.APIResponse(c, http.StatusOK, true, "Daftar Job Tersedia", orders)
+}
+
+// AcceptOrder untuk Mitra mengambil job
+func AcceptOrder(c *gin.Context) {
+	mitraID, _ := c.Get("userID") // ID User login (Mitra)
+	orderID := c.Param("id")
+
+	// 1. Cari Ordernya dulu
+	var order models.Order
+	if err := config.DB.First(&order, orderID).Error; err != nil {
+		utils.APIResponse(c, http.StatusNotFound, false, "Order tidak ditemukan", nil)
+		return
+	}
+
+	// 2. Validasi: Apakah order masih available?
+	// Ini mencegah "Race Condition" (Dua perawat klik barengan)
+	if order.PartnerID != nil {
+		utils.APIResponse(c, http.StatusBadRequest, false, "Yah, Order ini sudah diambil perawat lain!", nil)
+		return
+	}
+
+	if order.Status != "PAID" {
+		utils.APIResponse(c, http.StatusBadRequest, false, "Order belum lunas / sudah selesai", nil)
+		return
+	}
+
+	// 3. Cari ID Profile Mitra berdasarkan User ID
+	var profile models.PartnerProfile
+	if err := config.DB.Where("user_id = ?", mitraID).First(&profile).Error; err != nil {
+		utils.APIResponse(c, http.StatusForbidden, false, "Anda belum melengkapi profil mitra", nil)
+		return
+	}
+
+	// 4. Update Order: Masukkan ID Mitra & Ubah Status
+	// Kita pakai Transaction biar aman
+	tx := config.DB.Begin()
+
+	// Update Partner ID dan Status jadi ASSIGNED
+	order.PartnerID = &profile.ID // Simpan ID Profil Mitra, bukan User ID
+	order.Status = "ASSIGNED"     // Status baru: Sudah ada perawat
+
+	if err := tx.Save(&order).Error; err != nil {
+		tx.Rollback()
+		utils.APIResponse(c, http.StatusInternalServerError, false, "Gagal mengambil order", nil)
+		return
+	}
+
+	tx.Commit()
+
+	utils.APIResponse(c, http.StatusOK, true, "Selamat! Order berhasil diambil. Segera hubungi pasien.", order)
+}
