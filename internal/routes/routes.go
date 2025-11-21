@@ -40,6 +40,14 @@ func SetupRoutes(r *gin.Engine) {
 			partner := protected.Group("/partner")
 			{
 				partner.PUT("/profile", handlers.UpdatePartnerProfile)
+				// 1. Liat Job
+				partner.GET("/orders/available", handlers.GetAvailableOrders)
+
+				// 2. Ambil Job
+				partner.POST("/orders/:id/accept", handlers.AcceptOrder)
+
+				// 3. Lapor Kerja (Jurnal)
+				partner.POST("/orders/:id/journal", handlers.SubmitMedicalJournal)
 			}
 		}
 
