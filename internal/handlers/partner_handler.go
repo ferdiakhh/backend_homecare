@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"homecare-backend/internal/config"
 	"homecare-backend/internal/models"
 	"homecare-backend/pkg/utils"
@@ -25,29 +26,47 @@ func UpdatePartnerProfile(c *gin.Context) {
 	var profile models.PartnerProfile
 	err := config.DB.Where("user_id = ?", userID).First(&profile).Error
 
-	if err == gorm.ErrRecordNotFound {
-		// KASUS 1: Profil belum ada -> Buat Baru
-		profile = models.PartnerProfile{
-			UserID:          userID.(uint64),
-			STRNumber:       input.STRNumber,
-			ExperienceYears: input.ExperienceYears,
-			VideoIntroURL:   input.VideoIntroURL,
-			BioDescription:  input.BioDescription,
-			CurrentLat:      input.CurrentLat,
-			CurrentLng:      input.CurrentLng,
-			IsActive:        true, // Langsung aktifkan (atau bisa nunggu verifikasi admin)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// KASUS 1: Profil belum ada -> Buat Baru
+			profile = models.PartnerProfile{
+				UserID:          userID.(uint64),
+				STRNumber:       input.STRNumber,
+				ExperienceYears: input.ExperienceYears,
+				VideoIntroURL:   input.VideoIntroURL,
+				BioDescription:  input.BioDescription,
+				CurrentLat:      input.CurrentLat,
+				CurrentLng:      input.CurrentLng,
+				IsActive:        true, // Langsung aktifkan (atau bisa nunggu verifikasi admin)
+			}
+			if err := config.DB.Create(&profile).Error; err != nil {
+				utils.APIResponse(c, http.StatusInternalServerError, false, "Gagal membuat profil mitra", err.Error())
+				return
+			}
+		} else {
+			// Error DB selain record not found
+			utils.APIResponse(c, http.StatusInternalServerError, false, "Gagal mengambil profil mitra", err.Error())
+			return
 		}
-		config.DB.Create(&profile)
 	} else {
 		// KASUS 2: Profil sudah ada -> Update Data
-		config.DB.Model(&profile).Updates(models.PartnerProfile{
+		if err := config.DB.Model(&profile).Updates(models.PartnerProfile{
 			STRNumber:       input.STRNumber,
 			ExperienceYears: input.ExperienceYears,
 			VideoIntroURL:   input.VideoIntroURL,
 			BioDescription:  input.BioDescription,
 			CurrentLat:      input.CurrentLat,
 			CurrentLng:      input.CurrentLng,
-		})
+		}).Error; err != nil {
+			utils.APIResponse(c, http.StatusInternalServerError, false, "Gagal mengupdate profil mitra", err.Error())
+			return
+		}
+
+		// reload profile to return fresh data
+		if err := config.DB.Where("id = ?", profile.ID).First(&profile).Error; err != nil {
+			utils.APIResponse(c, http.StatusInternalServerError, false, "Gagal mengambil profil setelah update", err.Error())
+			return
+		}
 	}
 
 	utils.APIResponse(c, http.StatusOK, true, "Profil Mitra Berhasil Diupdate!", profile)

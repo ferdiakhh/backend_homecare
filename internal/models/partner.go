@@ -1,7 +1,5 @@
 package models
 
-import "time"
-
 type PartnerProfile struct {
 	ID              uint64  `gorm:"primaryKey" json:"id"`
 	UserID          uint64  `gorm:"not null" json:"user_id"`
@@ -11,10 +9,9 @@ type PartnerProfile struct {
 	BioDescription  string  `gorm:"type:text" json:"bio_description"`
 	RatingAvg       float64 `gorm:"default:0" json:"rating_avg"`
 	// Ensure enough integer digits for longitudes (up to ±180)
-	CurrentLat float64   `gorm:"type:decimal(11,8)" json:"current_lat"`
-	CurrentLng float64   `gorm:"type:decimal(11,8)" json:"current_lng"`
-	IsActive   bool      `gorm:"default:false" json:"is_active"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	CurrentLat float64 `gorm:"type:decimal(11,8)" json:"current_lat"`
+	CurrentLng float64 `gorm:"type:decimal(11,8)" json:"current_lng"`
+	IsActive   bool    `gorm:"default:false" json:"is_active"`
 }
 
 // Struct inputan dari Mitra saat update profil
