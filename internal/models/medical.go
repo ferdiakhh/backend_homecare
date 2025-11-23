@@ -9,7 +9,7 @@ type CareJournal struct {
 
 	// Disimpan sebagai JSON blob di database
 	// GORM akan mapping []byte ke tipe kolom JSON/TEXT di MySQL
-	VitalsData []byte `gorm:"type:json" json:"-"`
+	VitalsData []byte `gorm:"type:json" json:"vitals_data"`
 
 	Notes    string `gorm:"type:text" json:"notes"`
 	PhotoURL string `gorm:"size:255" json:"photo_url"`
