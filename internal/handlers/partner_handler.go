@@ -96,54 +96,58 @@ func GetAvailableOrders(c *gin.Context) {
 	utils.APIResponse(c, http.StatusOK, true, "Daftar Job Tersedia", orders)
 }
 
-// AcceptOrder untuk Mitra mengambil job
+// Update di: internal/handlers/partner_handler.go
+
 func AcceptOrder(c *gin.Context) {
-	mitraID, _ := c.Get("userID") // ID User login (Mitra)
+	mitraID, _ := c.Get("userID") // ID User Login (User ID)
 	orderID := c.Param("id")
 
-	// 1. Cari Ordernya dulu
+	// 1. Cari Order
 	var order models.Order
 	if err := config.DB.First(&order, orderID).Error; err != nil {
 		utils.APIResponse(c, http.StatusNotFound, false, "Order tidak ditemukan", nil)
 		return
 	}
 
-	// 2. Validasi: Apakah order masih available?
-	// Ini mencegah "Race Condition" (Dua perawat klik barengan)
-	if order.PartnerID != nil {
-		utils.APIResponse(c, http.StatusBadRequest, false, "Yah, Order ini sudah diambil perawat lain!", nil)
-		return
-	}
-
-	if order.Status != "PAID" {
-		utils.APIResponse(c, http.StatusBadRequest, false, "Order belum lunas / sudah selesai", nil)
-		return
-	}
-
-	// 3. Cari ID Profile Mitra berdasarkan User ID
+	// 2. Cari Profile Mitra dari User ID yang login
 	var profile models.PartnerProfile
 	if err := config.DB.Where("user_id = ?", mitraID).First(&profile).Error; err != nil {
-		utils.APIResponse(c, http.StatusForbidden, false, "Anda belum melengkapi profil mitra", nil)
+		utils.APIResponse(c, http.StatusForbidden, false, "Profil Mitra tidak ditemukan", nil)
 		return
 	}
 
-	// 4. Update Order: Masukkan ID Mitra & Ubah Status
-	// Kita pakai Transaction biar aman
-	tx := config.DB.Begin()
+	// 3. LOGIKA BARU (Handling Direct Booking vs Open Booking)
 
-	// Update Partner ID dan Status jadi ASSIGNED
-	order.PartnerID = &profile.ID // Simpan ID Profil Mitra, bukan User ID
-	order.Status = "ASSIGNED"     // Status baru: Sudah ada perawat
+	// Jika PartnerID di order sudah ada isinya (Direct Booking)
+	if order.PartnerID != nil {
+		// Cek: Apakah ID yang tertulis di order ITU SAYA?
+		if *order.PartnerID != profile.ID {
+			// Kalau bukan saya, berarti ini orderan direct buat orang lain!
+			utils.APIResponse(c, http.StatusForbidden, false, "Maaf, Order ini khusus untuk Mitra lain.", nil)
+			return
+		}
+		// Kalau iya (ID sama), berarti saya sedang mengkonfirmasi orderan direct ini. Lanjut!
+	} else {
+		// Jika PartnerID kosong (Open Booking), berarti siapa cepat dia dapat.
+		// Saya akan isi PartnerID dengan ID saya.
+		order.PartnerID = &profile.ID
+	}
 
-	if err := tx.Save(&order).Error; err != nil {
-		tx.Rollback()
-		utils.APIResponse(c, http.StatusInternalServerError, false, "Gagal mengambil order", nil)
+	// 4. Validasi Status (Hanya boleh ambil yang statusnya PAID)
+	if order.Status != "PAID" {
+		utils.APIResponse(c, http.StatusBadRequest, false, "Order belum dibayar atau sudah diambil", nil)
 		return
 	}
 
-	tx.Commit()
+	// 5. Update Status
+	order.Status = "ASSIGNED" // Atau "ON_DUTY" sesuai kesepakatan DB kemarin
 
-	utils.APIResponse(c, http.StatusOK, true, "Selamat! Order berhasil diambil. Segera hubungi pasien.", order)
+	if err := config.DB.Save(&order).Error; err != nil {
+		utils.APIResponse(c, http.StatusInternalServerError, false, "Gagal konfirmasi order", nil)
+		return
+	}
+
+	utils.APIResponse(c, http.StatusOK, true, "Order Berhasil Dikonfirmasi! Segera berangkat.", order)
 }
 
 // Update di: internal/handlers/partner_handler.go
@@ -188,4 +192,45 @@ func SearchPartners(c *gin.Context) {
 	}
 
 	utils.APIResponse(c, http.StatusOK, true, "Rekomendasi Mitra Terdekat", partners)
+}
+
+// RejectOrder: Mitra menolak orderan yang ditujukan padanya (Direct Booking)
+func RejectOrder(c *gin.Context) {
+	mitraID, _ := c.Get("userID")
+	orderID := c.Param("id")
+
+	// 1. Cari Order
+	var order models.Order
+	if err := config.DB.First(&order, orderID).Error; err != nil {
+		utils.APIResponse(c, http.StatusNotFound, false, "Order tidak ditemukan", nil)
+		return
+	}
+
+	// 2. Validasi: Apakah benar order ini ditujukan ke saya?
+	var profile models.PartnerProfile
+	config.DB.Where("user_id = ?", mitraID).First(&profile)
+
+	if order.PartnerID == nil || *order.PartnerID != profile.ID {
+		utils.APIResponse(c, http.StatusForbidden, false, "Anda tidak berhak menolak order ini", nil)
+		return
+	}
+
+	// 3. Validasi Status
+	if order.Status != "PAID" {
+		utils.APIResponse(c, http.StatusBadRequest, false, "Hanya order status PAID yang bisa ditolak", nil)
+		return
+	}
+
+	// 4. Update Status jadi CANCELLED (atau REFUND_NEEDED)
+	// Kita set PartnerID jadi NULL lagi biar history-nya jelas atau biarkan terisi untuk audit admin.
+	order.Status = "CANCELLED"
+
+	if err := config.DB.Save(&order).Error; err != nil {
+		utils.APIResponse(c, http.StatusInternalServerError, false, "Gagal menolak order", nil)
+		return
+	}
+
+	// TODO (Nanti): Trigger notifikasi ke Admin/Customer untuk proses Refund
+
+	utils.APIResponse(c, http.StatusOK, true, "Order ditolak. Admin akan memproses refund ke customer.", nil)
 }

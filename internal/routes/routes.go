@@ -47,6 +47,7 @@ func SetupRoutes(r *gin.Engine) {
 
 				// 2. Ambil Job
 				partner.POST("/orders/:id/accept", handlers.AcceptOrder)
+				partner.POST("/orders/:id/reject", handlers.RejectOrder)
 
 				// 3. Lapor Kerja (Jurnal)
 				partner.POST("/orders/:id/journal", handlers.SubmitMedicalJournal)
