@@ -21,6 +21,7 @@ func SetupRoutes(r *gin.Engine) {
 		// Route Layanan (Bisa diakses publik biar orang bisa liat harga dulu)
 		api.GET("/services", handlers.GetServices)
 		api.POST("/payment/notification", handlers.HandleMidtransNotification)
+		api.GET("/partners/search", handlers.SearchPartners)
 
 		// 2. PROTECTED ROUTES (Harus Login / Punya Token)
 		protected := api.Group("/")
@@ -35,6 +36,7 @@ func SetupRoutes(r *gin.Engine) {
 			// MODULE ORDER
 			protected.POST("/orders", handlers.CreateOrder)
 			protected.GET("/orders", handlers.GetMyOrders)
+			protected.GET("/orders/:id", handlers.GetOrderDetail)
 
 			// Group Khusus Mitra
 			partner := protected.Group("/partner")

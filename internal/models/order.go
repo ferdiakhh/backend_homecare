@@ -17,14 +17,17 @@ type Order struct {
 	UpdatedAt     time.Time `json:"updated_at"`
 
 	// Relasi (Preload) biar pas query datanya lengkap
-	Service Service `gorm:"foreignKey:ServiceID" json:"service"`
-	Patient Patient `gorm:"foreignKey:PatientID" json:"patient"`
-	Partner *User   `gorm:"foreignKey:PartnerID" json:"partner,omitempty"` // Ambil nama mitra dr tabel user
+	Service        Service         `gorm:"foreignKey:ServiceID" json:"service"`
+	Patient        Patient         `gorm:"foreignKey:PatientID" json:"patient"`
+	Partner        *User           `gorm:"foreignKey:PartnerID" json:"partner,omitempty"` // Ambil nama mitra dr tabel user
+	PartnerProfile *PartnerProfile `gorm:"foreignKey:PartnerID" json:"partner_info,omitempty"`
+	CareJournal    *CareJournal    `gorm:"foreignKey:OrderID" json:"medical_report,omitempty"`
 }
 
 type CreateOrderInput struct {
 	PatientID     uint64    `json:"patient_id" binding:"required"`
 	ServiceID     uint      `json:"service_id" binding:"required"`
+	PartnerID     uint64    `json:"partner_id"`
 	ScheduleStart time.Time `json:"schedule_start" binding:"required"` // Format: 2025-11-20T08:00:00Z
 	DurationHours int       `json:"duration_hours" binding:"required"` // Berapa jam/shift
 }

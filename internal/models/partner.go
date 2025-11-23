@@ -12,6 +12,7 @@ type PartnerProfile struct {
 	CurrentLat float64 `gorm:"type:decimal(11,8)" json:"current_lat"`
 	CurrentLng float64 `gorm:"type:decimal(11,8)" json:"current_lng"`
 	IsActive   bool    `gorm:"default:false" json:"is_active"`
+	User       User    `gorm:"foreignKey:UserID" json:"user_data,omitempty"`
 }
 
 // Struct inputan dari Mitra saat update profil

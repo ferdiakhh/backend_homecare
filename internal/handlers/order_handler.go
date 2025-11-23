@@ -40,6 +40,11 @@ func CreateOrder(c *gin.Context) {
 	orderNo := fmt.Sprintf("INV-%d", time.Now().Unix()) // Format: INV-17682391
 	endTime := input.ScheduleStart.Add(time.Duration(input.DurationHours) * time.Hour)
 
+	var partnerID *uint64
+	if input.PartnerID != 0 {
+		partnerID = &input.PartnerID
+	}
+
 	// 2. Simpan Order ke DB (Status PENDING)
 	order := models.Order{
 		OrderNo:       orderNo,
@@ -47,6 +52,7 @@ func CreateOrder(c *gin.Context) {
 		PatientID:     input.PatientID,
 		ServiceID:     input.ServiceID,
 		TotalAmount:   totalAmount,
+		PartnerID:     partnerID,
 		Status:        "PENDING_PAYMENT",
 		ScheduleStart: input.ScheduleStart,
 		ScheduleEnd:   endTime,
@@ -112,7 +118,37 @@ func GetMyOrders(c *gin.Context) {
 
 	var orders []models.Order
 	// Preload biar data Service dan Patient ikut keambil
-	config.DB.Preload("Service").Preload("Patient").Where("customer_id = ?", userID).Order("created_at desc").Find(&orders)
+	config.DB.
+		Preload("Service").
+		Preload("Patient").
+		Preload("PartnerProfile.User"). // <--- INI KUNCINYA
+		Where("customer_id = ?", userID).
+		Order("created_at desc").
+		Find(&orders)
 
 	utils.APIResponse(c, http.StatusOK, true, "History Order", orders)
+}
+
+// BARU: GetOrderDetail untuk melihat detail + Laporan Medis
+func GetOrderDetail(c *gin.Context) {
+	userID, _ := c.Get("userID") // ID Customer Login
+	orderID := c.Param("id")
+
+	var order models.Order
+
+	// Kita ambil Order spesifik, lalu Preload Jurnal Medis-nya
+	err := config.DB.
+		Preload("Service").
+		Preload("Patient").
+		Preload("PartnerProfile.User").
+		Preload("CareJournal").                               // <--- Ambil Laporan Medis
+		Where("id = ? AND customer_id = ?", orderID, userID). // Pastikan ini order milik dia sendiri
+		First(&order).Error
+
+	if err != nil {
+		utils.APIResponse(c, http.StatusNotFound, false, "Order tidak ditemukan", nil)
+		return
+	}
+
+	utils.APIResponse(c, http.StatusOK, true, "Detail Order & Laporan", order)
 }

@@ -145,3 +145,47 @@ func AcceptOrder(c *gin.Context) {
 
 	utils.APIResponse(c, http.StatusOK, true, "Selamat! Order berhasil diambil. Segera hubungi pasien.", order)
 }
+
+// Update di: internal/handlers/partner_handler.go
+
+func SearchPartners(c *gin.Context) {
+	// 1. Ambil koordinat Customer/Pasien dari Query Param
+	// Contoh URL: GET /api/v1/partners/search?lat=-6.200&lng=106.812
+	latStr := c.Query("lat")
+	lngStr := c.Query("lng")
+
+	if latStr == "" || lngStr == "" {
+		utils.APIResponse(c, http.StatusBadRequest, false, "Koordinat (lat/lng) wajib diisi", nil)
+		return
+	}
+
+	// Convert string ke float64
+	latParam := utils.StringToFloat(latStr) // Pastikan kamu punya helper ini atau pakai strconv
+	lngParam := utils.StringToFloat(lngStr)
+
+	var partners []models.PartnerProfile
+
+	// 2. Logika Filtering Radius (Haversine Formula MySQL)
+	// Angka 6371 adalah jari-jari bumi dalam KM.
+	// Query ini menghitung jarak antara (current_lat, current_lng) mitra dengan (latParam, lngParam) user.
+
+	radiusKM := 15 // Kita cari perawat dalam radius 15 KM
+
+	// Query Raw SQL untuk filter jarak & urutkan dari yang terdekat
+	err := config.DB.
+		Table("partner_profiles").
+		Select("partner_profiles.*, (6371 * acos(cos(radians(?)) * cos(radians(current_lat)) * cos(radians(current_lng) - radians(?)) + sin(radians(?)) * sin(radians(current_lat)))) AS distance", latParam, lngParam, latParam).
+		Joins("JOIN users ON users.id = partner_profiles.user_id"). // Join ke user biar bisa preload
+		Preload("User").                                            // Load data nama/foto
+		Where("is_active = ?", true).
+		Having("distance < ?", radiusKM). // Hanya yang < 15 KM
+		Order("distance ASC").            // Urutkan yang paling dekat duluan
+		Find(&partners).Error
+
+	if err != nil {
+		utils.APIResponse(c, http.StatusInternalServerError, false, "Gagal mencari mitra terdekat", err.Error())
+		return
+	}
+
+	utils.APIResponse(c, http.StatusOK, true, "Rekomendasi Mitra Terdekat", partners)
+}
