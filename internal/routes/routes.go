@@ -35,6 +35,7 @@ func SetupRoutes(r *gin.Engine) {
 			// MODULE PASIEN
 			protected.POST("/patients", handlers.AddPatient)
 			protected.GET("/patients", handlers.GetMyPatients)
+			protected.GET("/patients/:id/history", handlers.GetPatientHistory)
 
 			// MODULE ORDER
 			protected.POST("/orders", handlers.CreateOrder)
