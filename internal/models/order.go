@@ -17,8 +17,8 @@ type Order struct {
 	UpdatedAt     time.Time `json:"updated_at"`
 
 	// Relasi (Preload) biar pas query datanya lengkap
-	Service        Service         `gorm:"foreignKey:ServiceID" json:"service"`
-	Patient        Patient         `gorm:"foreignKey:PatientID" json:"patient"`
+	Service        *Service        `gorm:"foreignKey:ServiceID" json:"service,omitempty"`
+	Patient        *Patient        `gorm:"foreignKey:PatientID" json:"patient,omitempty"`
 	Partner        *User           `gorm:"foreignKey:PartnerID" json:"partner,omitempty"` // Ambil nama mitra dr tabel user
 	PartnerProfile *PartnerProfile `gorm:"foreignKey:PartnerID" json:"partner_info,omitempty"`
 	CareJournal    *CareJournal    `gorm:"foreignKey:OrderID" json:"medical_report,omitempty"`
