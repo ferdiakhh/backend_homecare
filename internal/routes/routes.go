@@ -8,6 +8,9 @@ import (
 )
 
 func SetupRoutes(r *gin.Engine) {
+
+	r.Use(middleware.CORSMiddleware())
+	r.Use(middleware.RateLimitMiddleware())
 	// Grouping API dengan Versi (v1)
 	api := r.Group("/api/v1")
 	{
