@@ -96,8 +96,7 @@ func GetAvailableOrders(c *gin.Context) {
 	utils.APIResponse(c, http.StatusOK, true, "Daftar Job Tersedia", orders)
 }
 
-// Update di: internal/handlers/partner_handler.go
-
+// AcceptOrder untuk Mitra mengambil/konfirmasi job
 func AcceptOrder(c *gin.Context) {
 	mitraID, _ := c.Get("userID") // ID User Login (User ID)
 	orderID := c.Param("id")
@@ -116,20 +115,15 @@ func AcceptOrder(c *gin.Context) {
 		return
 	}
 
-	// 3. LOGIKA BARU (Handling Direct Booking vs Open Booking)
-
-	// Jika PartnerID di order sudah ada isinya (Direct Booking)
+	// 3. LOGIKA DIRECT BOOKING (Handling Direct Booking vs Open Booking)
 	if order.PartnerID != nil {
-		// Cek: Apakah ID yang tertulis di order ITU SAYA?
+		// Jika PartnerID sudah terisi, Cek: Apakah ID yang tertulis di order ITU SAYA?
 		if *order.PartnerID != profile.ID {
-			// Kalau bukan saya, berarti ini orderan direct buat orang lain!
 			utils.APIResponse(c, http.StatusForbidden, false, "Maaf, Order ini khusus untuk Mitra lain.", nil)
 			return
 		}
-		// Kalau iya (ID sama), berarti saya sedang mengkonfirmasi orderan direct ini. Lanjut!
 	} else {
-		// Jika PartnerID kosong (Open Booking), berarti siapa cepat dia dapat.
-		// Saya akan isi PartnerID dengan ID saya.
+		// Jika PartnerID kosong (Open Booking), isi dengan ID saya.
 		order.PartnerID = &profile.ID
 	}
 
@@ -139,8 +133,28 @@ func AcceptOrder(c *gin.Context) {
 		return
 	}
 
-	// 5. Update Status
-	order.Status = "ASSIGNED" // Atau "ON_DUTY" sesuai kesepakatan DB kemarin
+	// ==========================================
+	// 5. PROTEKSI LAPISAN 1: CEK BENTROK JADWAL
+	// ==========================================
+	var conflictingOrders int64
+
+	// Cari order lain milik mitra ini yang statusnya ASSIGNED/ON_DUTY
+	// Dan waktunya tumpang tindih dengan order baru ini
+	config.DB.Model(&models.Order{}).
+		Where("partner_id = ?", profile.ID).
+		Where("status IN ('ASSIGNED', 'ON_DUTY')").
+		Where("id <> ?", order.ID). // Jangan hitung order ini sendiri (jaga-jaga)
+		// Rumus Logika Overlap: (StartA < EndB) AND (EndA > StartB)
+		Where("schedule_start < ? AND schedule_end > ?", order.ScheduleEnd, order.ScheduleStart).
+		Count(&conflictingOrders)
+
+	if conflictingOrders > 0 {
+		utils.APIResponse(c, http.StatusBadRequest, false, "Anda memiliki jadwal lain yang bentrok di jam ini!", nil)
+		return
+	}
+
+	// 6. Update Status
+	order.Status = "ASSIGNED" // Status berubah jadi ASSIGNED (Sudah dapat perawat)
 
 	if err := config.DB.Save(&order).Error; err != nil {
 		utils.APIResponse(c, http.StatusInternalServerError, false, "Gagal konfirmasi order", nil)
@@ -233,4 +247,35 @@ func RejectOrder(c *gin.Context) {
 	// TODO (Nanti): Trigger notifikasi ke Admin/Customer untuk proses Refund
 
 	utils.APIResponse(c, http.StatusOK, true, "Order ditolak. Admin akan memproses refund ke customer.", nil)
+}
+
+// TogglePartnerStatus untuk mengubah status On/Off Bid
+func TogglePartnerStatus(c *gin.Context) {
+	mitraID, _ := c.Get("userID") // ID User Login
+
+	// 1. Cari Profil Mitra
+	var profile models.PartnerProfile
+	if err := config.DB.Where("user_id = ?", mitraID).First(&profile).Error; err != nil {
+		utils.APIResponse(c, http.StatusForbidden, false, "Profil Mitra tidak ditemukan. Harap lengkapi profil dulu.", nil)
+		return
+	}
+
+	// 2. Logic Toggle (Balik Status)
+	// Kalau True jadi False, Kalau False jadi True
+	profile.IsActive = !profile.IsActive
+
+	if err := config.DB.Save(&profile).Error; err != nil {
+		utils.APIResponse(c, http.StatusInternalServerError, false, "Gagal mengubah status", nil)
+		return
+	}
+
+	// 3. Pesan Respon yang Enak Dibaca
+	statusStr := "OFFLINE (Tidak Menerima Order)"
+	if profile.IsActive {
+		statusStr = "ONLINE (Siap Menerima Order)"
+	}
+
+	utils.APIResponse(c, http.StatusOK, true, "Status berubah menjadi "+statusStr, gin.H{
+		"is_active": profile.IsActive,
+	})
 }
