@@ -47,6 +47,7 @@ func SetupRoutes(r *gin.Engine) {
 			{
 				partner.PUT("/profile", handlers.UpdatePartnerProfile)
 				partner.PATCH("/status", handlers.TogglePartnerStatus)
+				partner.GET("/orders/my-jobs", handlers.GetMyJobs)
 				// 1. Liat Job
 				partner.GET("/orders/available", handlers.GetAvailableOrders)
 

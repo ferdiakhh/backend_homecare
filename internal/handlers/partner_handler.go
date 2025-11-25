@@ -279,3 +279,27 @@ func TogglePartnerStatus(c *gin.Context) {
 		"is_active": profile.IsActive,
 	})
 }
+
+// GetMyJobs melihat daftar pekerjaan milik Mitra yang sedang aktif atau sudah selesai
+func GetMyJobs(c *gin.Context) {
+	mitraID, _ := c.Get("userID") // ID User Login
+
+	// Cari Profil Mitra dulu
+	var profile models.PartnerProfile
+	if err := config.DB.Where("user_id = ?", mitraID).First(&profile).Error; err != nil {
+		utils.APIResponse(c, http.StatusForbidden, false, "Profil Mitra tidak ditemukan", nil)
+		return
+	}
+
+	var jobs []models.Order
+
+	// Cari Order yang PartnerID-nya adalah ID saya
+	config.DB.
+		Preload("Service").
+		Preload("Patient").
+		Where("partner_id = ?", profile.ID).
+		Order("created_at desc").
+		Find(&jobs)
+
+	utils.APIResponse(c, http.StatusOK, true, "Daftar Pekerjaan Saya", jobs)
+}
