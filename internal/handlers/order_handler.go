@@ -102,13 +102,19 @@ func CreateOrder(c *gin.Context) {
 		return
 	}
 
-	// 4. Return Response dengan Token
+	// 4. Simpan Link Pembayaran ke Database!
+	// Ini langkah krusial agar link tidak hilang kalau user menutup browser.
+	order.PaymentURL = snapResp.RedirectURL
+	config.DB.Save(&order) // Update data order yang tadi dibuat
+
+	// 5. Return Response
 	utils.APIResponse(c, http.StatusCreated, true, "Order Berhasil! Silakan Bayar.", gin.H{
 		"order_id":     order.ID,
 		"order_no":     order.OrderNo,
 		"total_amount": order.TotalAmount,
-		"snap_token":   snapResp.Token,       // <--- INI YG DIPAKAI FRONTEND
-		"redirect_url": snapResp.RedirectURL, // <--- Link pembayaran web
+		"snap_token":   snapResp.Token,
+		"payment_url":  order.PaymentURL, // Frontend bisa pakai ini untuk tombol "Bayar Ulang"
+		"redirect_url": snapResp.RedirectURL,
 	})
 }
 

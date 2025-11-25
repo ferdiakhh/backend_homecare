@@ -11,6 +11,7 @@ type Order struct {
 	ServiceID     uint      `json:"service_id"`
 	TotalAmount   float64   `json:"total_amount"`
 	Status        string    `json:"status"` // PENDING_PAYMENT, PAID, etc
+	PaymentURL    string    `json:"payment_url"`
 	ScheduleStart time.Time `json:"schedule_start"`
 	ScheduleEnd   time.Time `json:"schedule_end"`
 	CreatedAt     time.Time `json:"created_at"`
