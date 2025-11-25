@@ -303,3 +303,17 @@ func GetMyJobs(c *gin.Context) {
 
 	utils.APIResponse(c, http.StatusOK, true, "Daftar Pekerjaan Saya", jobs)
 }
+
+func GetMyPartnerProfile(c *gin.Context) {
+	mitraID, _ := c.Get("userID") // ID User Login
+
+	var profile models.PartnerProfile
+
+	// Cari profile berdasarkan user_id, dan preload data User-nya
+	if err := config.DB.Preload("User").Where("user_id = ?", mitraID).First(&profile).Error; err != nil {
+		utils.APIResponse(c, http.StatusNotFound, false, "Profil Mitra belum dibuat", nil)
+		return
+	}
+
+	utils.APIResponse(c, http.StatusOK, true, "Data Lengkap Mitra", profile)
+}

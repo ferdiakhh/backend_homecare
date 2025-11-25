@@ -46,6 +46,7 @@ func SetupRoutes(r *gin.Engine) {
 			partner := protected.Group("/partner")
 			{
 				partner.PUT("/profile", handlers.UpdatePartnerProfile)
+				partner.GET("/profile/me", handlers.GetMyPartnerProfile)
 				partner.PATCH("/status", handlers.TogglePartnerStatus)
 				partner.GET("/orders/my-jobs", handlers.GetMyJobs)
 				// 1. Liat Job
@@ -57,6 +58,10 @@ func SetupRoutes(r *gin.Engine) {
 
 				// 3. Lapor Kerja (Jurnal)
 				partner.POST("/orders/:id/journal", handlers.SubmitMedicalJournal)
+
+				// MODUL KEUANGAN
+				partner.GET("/wallet", handlers.GetMyWallet)
+				partner.POST("/wallet/withdraw", handlers.RequestWithdrawal)
 			}
 		}
 
