@@ -18,6 +18,9 @@ type User struct {
 	CreatedAt    time.Time      `json:"created_at"`
 	UpdatedAt    time.Time      `json:"updated_at"`
 	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-"`
+
+	// Tambahkan Relasi ini (Has Many)
+	Patients []Patient `gorm:"foreignKey:CustomerID" json:"patients,omitempty"`
 }
 
 // Struct untuk menangkap Input Register dari user

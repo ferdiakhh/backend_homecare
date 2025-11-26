@@ -50,6 +50,20 @@ func GetDashboardStats(c *gin.Context) {
 	})
 }
 
+// GetAllCustomers melihat daftar semua user customer
+func GetAllCustomers(c *gin.Context) {
+	var customers []models.User
+
+	// Role ID 4 = Customer (Sesuaikan dengan DB kamu)
+	// Preload Patient biar admin tau customer ini punya pasien siapa aja
+	config.DB.
+		Preload("Patients").
+		Where("role_id = ?", 4).
+		Find(&customers)
+
+	utils.APIResponse(c, http.StatusOK, true, "Data Semua Customer", customers)
+}
+
 // GetAllOrders melihat semua riwayat transaksi di sistem
 func GetAllOrders(c *gin.Context) {
 	// Filter status (Opsional) ?status=PAID

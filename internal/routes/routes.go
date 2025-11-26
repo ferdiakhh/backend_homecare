@@ -70,6 +70,9 @@ func SetupRoutes(r *gin.Engine) {
 				// Dashboard Utama
 				admin.GET("/dashboard", middleware.AdminOnly(), handlers.GetDashboardStats)
 
+				// Manajemen Customer
+				admin.GET("/customers", middleware.AdminOnly(), handlers.GetAllCustomers)
+
 				// Manajemen Order (Ops)
 				admin.GET("/orders", middleware.AdminOnly(), handlers.GetAllOrders)
 
