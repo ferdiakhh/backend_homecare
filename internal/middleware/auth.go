@@ -56,3 +56,35 @@ func AuthMiddleware() gin.HandlerFunc {
 		c.Next() // Lanjut ke controller tujuan
 	}
 }
+
+// AdminOnly: Hanya untuk Role ID 1
+func AdminOnly() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		roleID, _ := c.Get("roleID")
+		// Pastikan casting aman
+		role := uint(roleID.(float64)) // Kadang JSON number jadi float64
+
+		if role != 1 {
+			utils.APIResponse(c, http.StatusForbidden, false, "Akses Ditolak: Khusus Admin", nil)
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+// FinanceOnly: Hanya untuk Role ID 2 (Atau Admin boleh intip)
+func FinanceOnly() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		roleID, _ := c.Get("roleID")
+		role := uint(roleID.(float64))
+
+		// Admin (1) juga boleh akses menu finance biar praktis
+		if role != 1 && role != 2 {
+			utils.APIResponse(c, http.StatusForbidden, false, "Akses Ditolak: Khusus Finance", nil)
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}

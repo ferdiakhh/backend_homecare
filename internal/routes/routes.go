@@ -63,6 +63,26 @@ func SetupRoutes(r *gin.Engine) {
 				partner.GET("/wallet", handlers.GetMyWallet)
 				partner.POST("/wallet/withdraw", handlers.RequestWithdrawal)
 			}
+
+			// Group ADMIN
+			admin := protected.Group("/admin")
+			{
+				// Dashboard Utama
+				admin.GET("/dashboard", middleware.AdminOnly(), handlers.GetDashboardStats)
+
+				// Manajemen Order (Ops)
+				admin.GET("/orders", middleware.AdminOnly(), handlers.GetAllOrders)
+
+				// Manajemen Service (Ops)
+				admin.PUT("/services/:id", middleware.AdminOnly(), handlers.UpdateServicePrice)
+				// Modul Mitra (Ops)
+				admin.GET("/partners/pending", middleware.AdminOnly(), handlers.GetPendingPartners)
+				admin.POST("/partners/:id/verify", middleware.AdminOnly(), handlers.VerifyPartner)
+
+				// Modul Keuangan (Finance)
+				admin.GET("/withdrawals", middleware.FinanceOnly(), handlers.GetPendingWithdrawals)
+				admin.POST("/withdrawals/:id/process", middleware.FinanceOnly(), handlers.ApproveWithdrawal)
+			}
 		}
 
 	}

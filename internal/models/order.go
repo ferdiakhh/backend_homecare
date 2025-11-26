@@ -23,6 +23,7 @@ type Order struct {
 	Partner        *User           `gorm:"foreignKey:PartnerID" json:"partner,omitempty"` // Ambil nama mitra dr tabel user
 	PartnerProfile *PartnerProfile `gorm:"foreignKey:PartnerID" json:"partner_info,omitempty"`
 	CareJournal    *CareJournal    `gorm:"foreignKey:OrderID" json:"medical_report,omitempty"`
+	Customer       User            `gorm:"foreignKey:CustomerID" json:"customer_info,omitempty"`
 }
 
 type CreateOrderInput struct {
