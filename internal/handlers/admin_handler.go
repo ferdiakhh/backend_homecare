@@ -188,16 +188,29 @@ func VerifyPartner(c *gin.Context) {
 
 // === FITUR FINANCE ===
 
-// GetPendingWithdrawals melihat request tarik dana
-func GetPendingWithdrawals(c *gin.Context) {
+// GetAllWithdrawals melihat daftar request tarik dana (Bisa filter status)
+func GetAllWithdrawals(c *gin.Context) {
+	// Ambil query param ?status=PENDING atau ?status=SUCCESS
+	status := c.Query("status")
+
 	var withdrawals []models.WalletTransaction
 
-	config.DB.
-		Where("type = ? AND status = ?", "WITHDRAWAL", "PENDING").
-		Order("created_at asc").
-		Find(&withdrawals)
+	// Query Dasar: Ambil semua transaksi tipe WITHDRAWAL
+	query := config.DB.
+		Where("type = ?", "WITHDRAWAL").
+		Order("created_at desc") // Urutkan dari terbaru
 
-	utils.APIResponse(c, http.StatusOK, true, "Daftar Penarikan Pending", withdrawals)
+	// Filter Dinamis: Kalau ada param status, pasang filter
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+
+	if err := query.Find(&withdrawals).Error; err != nil {
+		utils.APIResponse(c, http.StatusInternalServerError, false, "Gagal memuat data withdrawal", nil)
+		return
+	}
+
+	utils.APIResponse(c, http.StatusOK, true, "Daftar Penarikan Dana", withdrawals)
 }
 
 // ApproveWithdrawal menyetujui transfer

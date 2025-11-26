@@ -86,7 +86,7 @@ func SetupRoutes(r *gin.Engine) {
 				admin.POST("/partners/:id/verify", middleware.AdminOnly(), handlers.VerifyPartner)
 
 				// Modul Keuangan (Finance)
-				admin.GET("/withdrawals", middleware.FinanceOnly(), handlers.GetPendingWithdrawals)
+				admin.GET("/withdrawals", middleware.FinanceOnly(), handlers.GetAllWithdrawals)
 				admin.POST("/withdrawals/:id/process", middleware.FinanceOnly(), handlers.ApproveWithdrawal)
 			}
 		}
