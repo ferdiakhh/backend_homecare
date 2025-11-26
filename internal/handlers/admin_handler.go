@@ -135,6 +135,26 @@ func GetPendingPartners(c *gin.Context) {
 	utils.APIResponse(c, http.StatusOK, true, "Daftar Mitra Pending", partners)
 }
 
+// GetAllPartners melihat daftar SEMUA mitra (Aktif/Non-Aktif)
+func GetAllPartners(c *gin.Context) {
+	var partners []models.PartnerProfile
+
+	// Filter status (optional) ?active=true
+	status := c.Query("active")
+
+	query := config.DB.Preload("User")
+
+	if status == "true" {
+		query = query.Where("is_active = ?", true)
+	} else if status == "false" {
+		query = query.Where("is_active = ?", false)
+	}
+
+	query.Find(&partners)
+
+	utils.APIResponse(c, http.StatusOK, true, "Data Semua Mitra", partners)
+}
+
 // VerifyPartner menyetujui atau menolak mitra
 func VerifyPartner(c *gin.Context) {
 	partnerID := c.Param("id")

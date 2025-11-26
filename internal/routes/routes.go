@@ -73,6 +73,9 @@ func SetupRoutes(r *gin.Engine) {
 				// Manajemen Customer
 				admin.GET("/customers", middleware.AdminOnly(), handlers.GetAllCustomers)
 
+				// Manajemen Mitra
+				admin.GET("/partners", middleware.AdminOnly(), handlers.GetAllPartners)
+
 				// Manajemen Order (Ops)
 				admin.GET("/orders", middleware.AdminOnly(), handlers.GetAllOrders)
 
