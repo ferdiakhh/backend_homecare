@@ -15,7 +15,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
 			utils.APIResponse(c, http.StatusUnauthorized, false, "Token tidak ditemukan", nil)
-			c.Abort() // Stop, jangan lanjut ke handler
+			c.Abort()
 			return
 		}
 
@@ -32,12 +32,11 @@ func AuthMiddleware() gin.HandlerFunc {
 		// 3. Validasi Token
 		token, err := utils.ValidateToken(tokenString)
 		if err != nil || !token.Valid {
-			utils.APIResponse(c, http.StatusUnauthorized, false, "Token tidak valid atau kadaluarsa", nil)
+			utils.APIResponse(c, http.StatusUnauthorized, false, "Token tidak valid", nil)
 			c.Abort()
 			return
 		}
 
-		// 4. Ambil Data Claims (User ID & Role) dari Token
 		claims, ok := token.Claims.(jwt.MapClaims)
 		if !ok {
 			utils.APIResponse(c, http.StatusUnauthorized, false, "Gagal memproses token", nil)
@@ -45,24 +44,38 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// 5. Simpan User ID ke Context Gin (Biar bisa dipake di Controller nanti)
-		// Note: JSON number biasanya jadi float64 di Go
-		userID := uint64(claims["user_id"].(float64))
-		roleID := uint(claims["role_id"].(float64))
+		// AMAN: JWT Parse number as float64 -> Convert to uint -> Save to Context
+		var userID uint64
+		if val, ok := claims["user_id"].(float64); ok {
+			userID = uint64(val)
+		}
+
+		var roleID uint
+		if val, ok := claims["role_id"].(float64); ok {
+			roleID = uint(val)
+		}
 
 		c.Set("userID", userID)
-		c.Set("roleID", roleID)
+		c.Set("roleID", roleID) // Disimpan sebagai UINT
 
-		c.Next() // Lanjut ke controller tujuan
+		c.Next()
 	}
 }
 
 // AdminOnly: Hanya untuk Role ID 1
 func AdminOnly() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		roleID, _ := c.Get("roleID")
-		// Pastikan casting aman
-		role := uint(roleID.(float64)) // Kadang JSON number jadi float64
+		roleID, exists := c.Get("roleID")
+		if !exists {
+			utils.APIResponse(c, http.StatusForbidden, false, "Akses Ditolak", nil)
+			c.Abort()
+			return
+		}
+
+		// PERBAIKAN DI SINI:
+		// Karena di AuthMiddleware sudah disimpan sebagai UINT,
+		// Maka di sini kita ambil langsung sebagai UINT juga.
+		role := roleID.(uint)
 
 		if role != 1 {
 			utils.APIResponse(c, http.StatusForbidden, false, "Akses Ditolak: Khusus Admin", nil)
@@ -76,10 +89,17 @@ func AdminOnly() gin.HandlerFunc {
 // FinanceOnly: Hanya untuk Role ID 2 (Atau Admin boleh intip)
 func FinanceOnly() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		roleID, _ := c.Get("roleID")
-		role := uint(roleID.(float64))
+		roleID, exists := c.Get("roleID")
+		if !exists {
+			utils.APIResponse(c, http.StatusForbidden, false, "Akses Ditolak", nil)
+			c.Abort()
+			return
+		}
 
-		// Admin (1) juga boleh akses menu finance biar praktis
+		// PERBAIKAN DI SINI JUGA:
+		role := roleID.(uint)
+
+		// Admin (1) juga boleh akses menu finance
 		if role != 1 && role != 2 {
 			utils.APIResponse(c, http.StatusForbidden, false, "Akses Ditolak: Khusus Finance", nil)
 			c.Abort()
