@@ -86,12 +86,66 @@ func GetAllOrders(c *gin.Context) {
 	utils.APIResponse(c, http.StatusOK, true, "Data Semua Order", orders)
 }
 
-// UpdateServicePrice mengubah harga layanan
-func UpdateServicePrice(c *gin.Context) {
+// CreateService menambahkan layanan baru
+func CreateService(c *gin.Context) {
+	var input struct {
+		Name        string  `json:"name" binding:"required"`
+		Description string  `json:"description"`
+		Price       float64 `json:"price" binding:"required"`
+		AdminFee    float64 `json:"admin_fee"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		utils.APIResponse(c, http.StatusBadRequest, false, "Input layanan tidak lengkap", err.Error())
+		return
+	}
+
+	service := models.Service{
+		Name:        input.Name,
+		Description: input.Description,
+		Price:       input.Price,
+		AdminFee:    input.AdminFee,
+	}
+
+	if err := config.DB.Create(&service).Error; err != nil {
+		utils.APIResponse(c, http.StatusInternalServerError, false, "Gagal membuat layanan", nil)
+		return
+	}
+
+	utils.APIResponse(c, http.StatusCreated, true, "Layanan Baru Berhasil Dibuat", service)
+}
+
+// DeleteService menghapus layanan berdasarkan ID
+func DeleteService(c *gin.Context) {
+	id := c.Param("id")
+
+	// Cek dulu apakah layanan ini sudah pernah dipesan?
+	// Kalau sudah ada history order, sebaiknya jangan dihapus permanen (Hard Delete) karena akan merusak history.
+	// Gunakan Soft Delete jika model Service mendukung gorm.DeletedAt, atau tolak penghapusan.
+
+	var count int64
+	config.DB.Model(&models.Order{}).Where("service_id = ?", id).Count(&count)
+	if count > 0 {
+		utils.APIResponse(c, http.StatusBadRequest, false, "Layanan tidak bisa dihapus karena sudah pernah dipesan. Silakan nonaktifkan saja (Fitur next phase) atau update harga.", nil)
+		return
+	}
+
+	if err := config.DB.Delete(&models.Service{}, id).Error; err != nil {
+		utils.APIResponse(c, http.StatusInternalServerError, false, "Gagal menghapus layanan", nil)
+		return
+	}
+
+	utils.APIResponse(c, http.StatusOK, true, "Layanan Berhasil Dihapus", nil)
+}
+
+// UpdateService mengubah data layanan secara lengkap
+func UpdateService(c *gin.Context) {
 	id := c.Param("id")
 	var input struct {
-		Price    float64 `json:"price"`
-		AdminFee float64 `json:"admin_fee"`
+		Name        string  `json:"name"`
+		Description string  `json:"description"`
+		Price       float64 `json:"price"`
+		AdminFee    float64 `json:"admin_fee"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -105,17 +159,22 @@ func UpdateServicePrice(c *gin.Context) {
 		return
 	}
 
-	// Update
+	// Update fields jika ada input
+	if input.Name != "" {
+		service.Name = input.Name
+	}
+	if input.Description != "" {
+		service.Description = input.Description
+	}
 	if input.Price > 0 {
 		service.Price = input.Price
 	}
-	if input.AdminFee > 0 {
-		service.AdminFee = input.AdminFee
-	}
+	// AdminFee boleh 0, jadi kita tidak cek > 0 (tapi cek input logic di frontend)
+	service.AdminFee = input.AdminFee
 
 	config.DB.Save(&service)
 
-	utils.APIResponse(c, http.StatusOK, true, "Harga Layanan Diupdate", service)
+	utils.APIResponse(c, http.StatusOK, true, "Data Layanan Diperbarui", service)
 }
 
 // === FITUR ADMIN OPS ===

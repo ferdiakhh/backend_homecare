@@ -79,8 +79,11 @@ func SetupRoutes(r *gin.Engine) {
 				// Manajemen Order (Ops)
 				admin.GET("/orders", middleware.AdminOnly(), handlers.GetAllOrders)
 
-				// Manajemen Service (Ops)
-				admin.PUT("/services/:id", middleware.AdminOnly(), handlers.UpdateServicePrice)
+				// Manajemen Service (Master Data)
+				admin.POST("/services", middleware.AdminOnly(), handlers.CreateService)
+				admin.PUT("/services/:id", middleware.AdminOnly(), handlers.UpdateService)
+				admin.DELETE("/services/:id", middleware.AdminOnly(), handlers.DeleteService)
+
 				// Modul Mitra (Ops)
 				admin.GET("/partners/pending", middleware.AdminOnly(), handlers.GetPendingPartners)
 				admin.POST("/partners/:id/verify", middleware.AdminOnly(), handlers.VerifyPartner)
