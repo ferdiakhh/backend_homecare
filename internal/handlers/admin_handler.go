@@ -6,6 +6,8 @@ import (
 	"homecare-backend/pkg/utils"
 	"net/http"
 
+	"strings"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -278,7 +280,14 @@ func ApproveWithdrawal(c *gin.Context) {
 	var input struct {
 		Action string `json:"action" binding:"required,oneof=approve reject"`
 	}
-	// Bind JSON...
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		utils.APIResponse(c, http.StatusBadRequest, false, "Input salah", err.Error())
+		return
+	}
+
+	// Normalisasi input biar aman (approve/Approve/APPROVE dianggap sama)
+	action := strings.ToLower(input.Action)
 
 	var trx models.WalletTransaction
 	if err := config.DB.First(&trx, trxID).Error; err != nil {
@@ -293,21 +302,42 @@ func ApproveWithdrawal(c *gin.Context) {
 
 	tx := config.DB.Begin()
 
-	if input.Action == "approve" {
+	if action == "approve" {
 		trx.Status = "SUCCESS"
-		// Di dunia nyata: Panggil API Disbursement Midtrans/Xendit di sini
-	} else {
+		// Di sini nanti integrasi Disbursement Xendit/Midtrans
+	} else if action == "reject" {
 		trx.Status = "FAILED"
+
 		// KEMBALIKAN SALDO KE DOMPET MITRA
 		var wallet models.Wallet
-		if err := tx.First(&wallet, trx.WalletID).Error; err == nil {
-			wallet.Balance += trx.Amount
-			tx.Save(&wallet)
+		if err := tx.First(&wallet, trx.WalletID).Error; err != nil {
+			tx.Rollback()
+			utils.APIResponse(c, http.StatusInternalServerError, false, "Wallet mitra tidak ditemukan", nil)
+			return
 		}
+
+		wallet.Balance += trx.Amount
+		if err := tx.Save(&wallet).Error; err != nil {
+			tx.Rollback()
+			utils.APIResponse(c, http.StatusInternalServerError, false, "Gagal refund saldo", err.Error())
+			return
+		}
+	} else {
+		// Jaga-jaga kalau lolos binding tapi bukan approve/reject
+		tx.Rollback()
+		utils.APIResponse(c, http.StatusBadRequest, false, "Aksi tidak dikenali", nil)
+		return
 	}
 
-	tx.Save(&trx)
+	// PERBAIKAN UTAMA: Cek Error saat Save Status Transaksi!
+	if err := tx.Save(&trx).Error; err != nil {
+		tx.Rollback()
+		// Error ini biasanya karena ENUM di database tidak cocok dengan string "SUCCESS"/"FAILED"
+		utils.APIResponse(c, http.StatusInternalServerError, false, "Gagal update status transaksi: "+err.Error(), nil)
+		return
+	}
+
 	tx.Commit()
 
-	utils.APIResponse(c, http.StatusOK, true, "Status Penarikan Diupdate", nil)
+	utils.APIResponse(c, http.StatusOK, true, "Status Penarikan Berhasil Diupdate menjadi "+trx.Status, nil)
 }
