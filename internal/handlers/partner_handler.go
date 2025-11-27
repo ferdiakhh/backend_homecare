@@ -79,6 +79,7 @@ func GetServices(c *gin.Context) {
 		Name        string  `json:"name"`
 		Description string  `json:"description"`
 		Price       float64 `json:"price"`
+		AdminFee    float64 `json:"admin_fee"`
 	}
 	// Ambil semua layanan dari DB
 	config.DB.Table("services").Find(&services)
