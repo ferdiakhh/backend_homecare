@@ -10,6 +10,9 @@ type Wallet struct {
 
 	// Relasi ke History Transaksi
 	Transactions []WalletTransaction `gorm:"foreignKey:WalletID" json:"transactions,omitempty"`
+
+	// Relasi ke User (Owner)
+	User User `gorm:"foreignKey:UserID" json:"user,omitempty"`
 }
 
 type WalletTransaction struct {

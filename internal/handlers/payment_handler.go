@@ -84,8 +84,20 @@ func HandleMidtransNotification(c *gin.Context) {
 
 	// 7. KIRIM NOTIFIKASI JIKA PAID (NEW ORDER)
 	if orderStatus == "PAID" {
-		// ... (Logic Existing) ...
-		// A. Cek Direct Booking atau Open Booking
+		// A. Notifikasi ke Customer (Payment Success)
+		var customer models.User
+		if err := config.DB.First(&customer, order.CustomerID).Error; err == nil {
+			if customer.FCMToken != "" {
+				utils.SendNotification(
+					customer.FCMToken,
+					"Pembayaran Berhasil! ✅",
+					"Terima kasih! Pembayaran Anda telah diterima. Kami sedang mencarikan Mitra untuk Anda.",
+					map[string]string{"order_id": fmt.Sprintf("%d", order.ID), "type": "payment_success"},
+				)
+			}
+		}
+
+		// B. Cek Direct Booking atau Open Booking
 		if order.PartnerID != nil {
 			// --- DIRECT BOOKING ---
 			// Kita butuh User ID dari partner_profile, tapi di Order cuma ada PartnerID (Profile ID)

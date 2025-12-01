@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"homecare-backend/internal/config"
 	"homecare-backend/internal/models"
 	"homecare-backend/pkg/utils"
@@ -340,4 +341,34 @@ func ApproveWithdrawal(c *gin.Context) {
 	tx.Commit()
 
 	utils.APIResponse(c, http.StatusOK, true, "Status Penarikan Berhasil Diupdate menjadi "+trx.Status, nil)
+
+	// KIRIM NOTIFIKASI KE MITRA
+	// Kita perlu ambil User ID dari Wallet untuk dapat FCM Token
+	var wallet models.Wallet
+	if err := config.DB.Preload("User").First(&wallet, trx.WalletID).Error; err == nil {
+		if wallet.User.FCMToken != "" {
+			title := ""
+			body := ""
+			typeNotif := ""
+
+			if trx.Status == "SUCCESS" {
+				title = "Penarikan Dana Berhasil! 💰"
+				body = fmt.Sprintf("Permintaan penarikan dana sebesar Rp %.0f telah disetujui dan ditransfer.", trx.Amount)
+				typeNotif = "withdrawal_approved"
+			} else if trx.Status == "FAILED" {
+				title = "Penarikan Dana Ditolak ❌"
+				body = "Maaf, permintaan penarikan dana Anda ditolak. Saldo telah dikembalikan."
+				typeNotif = "withdrawal_rejected"
+			}
+
+			if title != "" {
+				utils.SendNotification(
+					wallet.User.FCMToken,
+					title,
+					body,
+					map[string]string{"transaction_id": fmt.Sprintf("%d", trx.ID), "type": typeNotif},
+				)
+			}
+		}
+	}
 }
