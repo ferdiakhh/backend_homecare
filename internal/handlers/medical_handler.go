@@ -45,6 +45,12 @@ func SubmitMedicalJournal(c *gin.Context) {
 		return
 	}
 
+	// VALIDASI FLOW: Harus ON_DUTY dulu baru bisa submit jurnal
+	if order.Status != "ON_DUTY" {
+		utils.APIResponse(c, http.StatusBadRequest, false, "Anda harus memulai pekerjaan (Start Order) terlebih dahulu sebelum submit jurnal.", nil)
+		return
+	}
+
 	// MULAI TRANSAKSI DATABASE (PENTING!)
 	// Kita pakai transaksi biar aman: Kalau update saldo gagal, simpan jurnal juga dibatalkan.
 	tx := config.DB.Begin()
