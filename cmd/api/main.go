@@ -23,6 +23,9 @@ func main() {
 	// 2. Connect DB
 	config.ConnectDB()
 
+	// Init Firebase
+	utils.InitFCM()
+
 	// 3. Init Router
 	r := gin.Default()
 

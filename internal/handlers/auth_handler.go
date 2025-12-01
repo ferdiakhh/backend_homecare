@@ -70,6 +70,14 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	// ===> LOGIKA UPDATE FCM TOKEN (BARU) <===
+	// Jika frontend mengirim token FCM, simpan ke database
+	if input.FCMToken != "" {
+		user.FCMToken = input.FCMToken
+		// Kita hanya update kolom fcm_token agar efisien
+		config.DB.Model(&user).Update("fcm_token", input.FCMToken)
+	}
+
 	// 4. Generate JWT Token
 	token, err := utils.GenerateToken(user.ID, user.RoleID)
 	if err != nil {

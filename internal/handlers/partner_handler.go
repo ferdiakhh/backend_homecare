@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"homecare-backend/internal/config"
 	"homecare-backend/internal/models"
 	"homecare-backend/pkg/utils"
@@ -163,6 +164,67 @@ func AcceptOrder(c *gin.Context) {
 	}
 
 	utils.APIResponse(c, http.StatusOK, true, "Order Berhasil Dikonfirmasi! Segera berangkat.", order)
+
+	// 7. KIRIM NOTIFIKASI KE CUSTOMER
+	// Ambil data customer (User) dari order
+	var customer models.User
+	if err := config.DB.First(&customer, order.CustomerID).Error; err == nil {
+		if customer.FCMToken != "" {
+			utils.SendNotification(
+				customer.FCMToken,
+				"Mitra Menuju Lokasi! 🚑",
+				fmt.Sprintf("Mitra %s telah menerima pesanan Anda dan akan segera berangkat.", profile.User.FullName),
+				map[string]string{"order_id": fmt.Sprintf("%d", order.ID), "type": "order_accepted"},
+			)
+		}
+	}
+}
+
+// StartOrder: Mitra menekan tombol "Mulai Kerja" saat sampai di lokasi
+func StartOrder(c *gin.Context) {
+	mitraID, _ := c.Get("userID")
+	orderID := c.Param("id")
+
+	// 1. Cari Order
+	var order models.Order
+	if err := config.DB.First(&order, orderID).Error; err != nil {
+		utils.APIResponse(c, http.StatusNotFound, false, "Order tidak ditemukan", nil)
+		return
+	}
+
+	// 2. Validasi Mitra
+	var profile models.PartnerProfile
+	if err := config.DB.Preload("User").Where("user_id = ?", mitraID).First(&profile).Error; err != nil {
+		utils.APIResponse(c, http.StatusForbidden, false, "Profil Mitra tidak ditemukan", nil)
+		return
+	}
+
+	if order.PartnerID == nil || *order.PartnerID != profile.ID {
+		utils.APIResponse(c, http.StatusForbidden, false, "Bukan order Anda", nil)
+		return
+	}
+
+	// 3. Update Status
+	order.Status = "ON_DUTY"
+	if err := config.DB.Save(&order).Error; err != nil {
+		utils.APIResponse(c, http.StatusInternalServerError, false, "Gagal update status", nil)
+		return
+	}
+
+	// 4. Kirim Notifikasi ke Customer
+	var customer models.User
+	if err := config.DB.First(&customer, order.CustomerID).Error; err == nil {
+		if customer.FCMToken != "" {
+			utils.SendNotification(
+				customer.FCMToken,
+				"Mitra Telah Sampai! 🩺",
+				fmt.Sprintf("Mitra %s sudah di lokasi dan siap memulai layanan.", profile.User.FullName),
+				map[string]string{"order_id": fmt.Sprintf("%d", order.ID), "type": "order_started"},
+			)
+		}
+	}
+
+	utils.APIResponse(c, http.StatusOK, true, "Status: ON DUTY. Selamat bekerja!", order)
 }
 
 // Update di: internal/handlers/partner_handler.go
@@ -248,6 +310,19 @@ func RejectOrder(c *gin.Context) {
 	// TODO (Nanti): Trigger notifikasi ke Admin/Customer untuk proses Refund
 
 	utils.APIResponse(c, http.StatusOK, true, "Order ditolak. Admin akan memproses refund ke customer.", nil)
+
+	// 5. KIRIM NOTIFIKASI KE CUSTOMER
+	var customer models.User
+	if err := config.DB.First(&customer, order.CustomerID).Error; err == nil {
+		if customer.FCMToken != "" {
+			utils.SendNotification(
+				customer.FCMToken,
+				"Order Ditolak Mitra 😞",
+				fmt.Sprintf("Maaf, Mitra %s tidak bisa mengambil order ini. Admin akan segera memproses refund/mencari pengganti.", profile.User.FullName),
+				map[string]string{"order_id": fmt.Sprintf("%d", order.ID), "type": "order_rejected"},
+			)
+		}
+	}
 }
 
 // TogglePartnerStatus untuk mengubah status On/Off Bid

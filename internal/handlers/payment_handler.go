@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"homecare-backend/internal/config"
 	"homecare-backend/internal/models"
 	"homecare-backend/pkg/utils"
@@ -79,6 +80,63 @@ func HandleMidtransNotification(c *gin.Context) {
 		log.Printf("[Webhook] Order %s status successfully updated to %s", notification.OrderID, orderStatus)
 	} else {
 		log.Printf("[Webhook] Order %s status unchanged (already %s)", notification.OrderID, orderStatus)
+	}
+
+	// 7. KIRIM NOTIFIKASI JIKA PAID (NEW ORDER)
+	if orderStatus == "PAID" {
+		// ... (Logic Existing) ...
+		// A. Cek Direct Booking atau Open Booking
+		if order.PartnerID != nil {
+			// --- DIRECT BOOKING ---
+			// Kita butuh User ID dari partner_profile, tapi di Order cuma ada PartnerID (Profile ID)
+			// Jadi kita harus join ke tabel partner_profiles lalu ke users
+			var profile models.PartnerProfile
+			if err := config.DB.Preload("User").First(&profile, *order.PartnerID).Error; err == nil {
+				// Kirim Notif ke Mitra
+				if profile.User.FCMToken != "" {
+					utils.SendNotification(
+						profile.User.FCMToken,
+						"Order Baru Masuk! 🔔",
+						"Ada pasien yang memesan jasa Anda secara khusus. Segera konfirmasi!",
+						map[string]string{"order_id": fmt.Sprintf("%d", order.ID), "type": "new_order_direct"},
+					)
+				}
+			}
+		} else {
+			// --- OPEN BOOKING (BROADCAST) ---
+			// Cari mitra di sekitar pasien (Logic mirip SearchPartners)
+			// Kita butuh koordinat pasien. Asumsi: Pasien ada di alamat yg tersimpan (Next: Order harus punya lat/lng sendiri)
+			// Untuk sekarang, kita broadcast ke SEMUA mitra yang ONLINE saja dulu atau radius jika memungkinkan.
+			// Simplifikasi: Broadcast ke semua mitra aktif yang punya token.
+
+			var activePartners []models.PartnerProfile
+			config.DB.Preload("User").Where("is_active = ?", true).Find(&activePartners)
+
+			for _, p := range activePartners {
+				if p.User.FCMToken != "" {
+					go utils.SendNotification( // Pakai goroutine biar gak blocking
+						p.User.FCMToken,
+						"Lowongan Job Baru! 📢",
+						"Ada order baru di area sekitar Anda. Cek sekarang sebelum diambil orang lain!",
+						map[string]string{"order_id": fmt.Sprintf("%d", order.ID), "type": "new_order_open"},
+					)
+				}
+			}
+		}
+	} else if orderStatus == "CANCELLED" {
+		// 8. KIRIM NOTIFIKASI JIKA CANCELLED (Payment Failed/Expired)
+		// Cari User Customer
+		var customer models.User
+		if err := config.DB.First(&customer, order.CustomerID).Error; err == nil {
+			if customer.FCMToken != "" {
+				utils.SendNotification(
+					customer.FCMToken,
+					"Pembayaran Gagal/Expired ❌",
+					"Maaf, pesanan Anda dibatalkan karena pembayaran gagal atau waktu habis.",
+					map[string]string{"order_id": fmt.Sprintf("%d", order.ID), "type": "order_cancelled"},
+				)
+			}
+		}
 	}
 
 	// 6. Response OK ke Midtrans (Wajib biar Midtrans tau kita udah terima)

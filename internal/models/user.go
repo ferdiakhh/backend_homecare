@@ -15,6 +15,7 @@ type User struct {
 	PasswordHash string         `gorm:"not null" json:"-"` // json:"-" artinya field ini TIDAK AKAN dikirim balik ke frontend (rahasia)
 	Phone        string         `gorm:"column:phone_number;size:20;unique" json:"phone"`
 	IsVerified   bool           `gorm:"default:false" json:"is_verified"`
+	FCMToken     string         `gorm:"type:text" json:"fcm_token"`
 	CreatedAt    time.Time      `json:"created_at"`
 	UpdatedAt    time.Time      `json:"updated_at"`
 	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-"`
@@ -36,4 +37,5 @@ type RegisterInput struct {
 type LoginInput struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required"`
+	FCMToken string `json:"fcm_token"`
 }

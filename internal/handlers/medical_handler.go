@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"homecare-backend/internal/config"
 	"homecare-backend/internal/models"
 	"homecare-backend/pkg/utils"
@@ -138,4 +139,17 @@ func SubmitMedicalJournal(c *gin.Context) {
 		"income":     mitraShare, // Kasih tau mitra dia dapet berapa
 		"status":     "COMPLETED",
 	})
+
+	// 6. KIRIM NOTIFIKASI KE CUSTOMER
+	var customer models.User
+	if err := tx.First(&customer, order.CustomerID).Error; err == nil {
+		if customer.FCMToken != "" {
+			go utils.SendNotification(
+				customer.FCMToken,
+				"Layanan Selesai! ✅",
+				fmt.Sprintf("Terima kasih! Layanan homecare telah selesai. Silakan cek laporan medis Anda."),
+				map[string]string{"order_id": fmt.Sprintf("%d", order.ID), "type": "order_completed"},
+			)
+		}
+	}
 }

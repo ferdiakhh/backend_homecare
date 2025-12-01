@@ -54,6 +54,7 @@ func SetupRoutes(r *gin.Engine) {
 
 				// 2. Ambil Job
 				partner.POST("/orders/:id/accept", handlers.AcceptOrder)
+				partner.POST("/orders/:id/start", handlers.StartOrder) // <--- ROUTE BARU
 				partner.POST("/orders/:id/reject", handlers.RejectOrder)
 
 				// 3. Lapor Kerja (Jurnal)
